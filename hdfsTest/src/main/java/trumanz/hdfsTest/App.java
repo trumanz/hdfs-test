@@ -1,8 +1,12 @@
 package trumanz.hdfsTest;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.apache.log4j.Logger;
+
+import com.google.gson.Gson;
 
 /**
  * Hello world!
@@ -12,10 +16,13 @@ public class App
 {
     public static void main( String[] args ) throws Exception
     {
-    	
+    	try{
+    		
+    		
     	Logger.getLogger("trumanz").info("Hello World");
     	
         AmbariWrapper ambari = new AmbariWrapper("http://as:8080", "admin", "admin");
+        /*
         String  hdfs_uri = ambari.getDefaultFS();
         //System.out.println(hdfs_uri);
         HdfsWrapper hdfs = new HdfsWrapper(hdfs_uri);
@@ -25,8 +32,15 @@ public class App
         hdfs.append("/input/tt1", strBuilder.toString());
         //hdfs.showPath("/input");
         Logger.getLogger("trumanz").info(hdfs.getBlockInformation("/input/tt1"));
-        
+        */
         ambari.stopDataNode("ag2");
      //   ambari.stopServiceComponent();
+    	}catch(javax.ws.rs.BadRequestException e){
+    		
+    		
+    		Logger.getLogger("trumanz").warn(e.getResponse().getEntity());
+    		Logger.getLogger("trumanz").warn(e.getResponse().getMetadata().toString());
+    		//throw e;
+    	}
     }
 }
