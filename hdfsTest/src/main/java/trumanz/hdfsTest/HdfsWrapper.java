@@ -1,5 +1,6 @@
 package trumanz.hdfsTest;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -20,66 +21,55 @@ import com.google.gson.JsonParser;
 import org.apache.commons.httpclient.URI;
 import org.apache.commons.httpclient.util.URIUtil;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.BlockLocation;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.log4j.Logger;
 
 
 public class HdfsWrapper {
-	static void test(final String host) throws IOException{
+	public HdfsWrapper(String base_uri) throws IllegalArgumentException, IOException, InterruptedException{
+		this.base_path = new Path(base_uri);
+		this.fs = FileSystem.get(base_path.toUri(), new Configuration(), "hdfs");
+	}
+	public void showPath(final String path) throws FileNotFoundException, IllegalArgumentException, IOException{
 		
-		if(true) return;
-		String response = null;
-		HttpAuthenticationFeature auth = HttpAuthenticationFeature.basic("admin", "admin");
-		ClientConfig clientConfig = new ClientConfig().register(auth);
-	    Client c = ClientBuilder.newClient(clientConfig);
-        WebTarget target = c.target("http://172.17.0.1:8080");
-        
-        response  = target.path("/api/v1/clusters").request().get(String.class);
-        //System.out.println(response);
-       
-        JsonParser jParser = new JsonParser();
-        
-        String clusterName = jParser.parse(response).getAsJsonObject()
-        		.getAsJsonArray("items")
-        		.get(0).getAsJsonObject().getAsJsonObject("Clusters")
-        		.getAsJsonPrimitive("cluster_name").toString().replaceAll("\"", "");
-       
-        
-       System.out.println("Cluster: " + clusterName);
-       
-       String path = "/api/v1/clusters/" + clusterName + "/services/HDFS/components/NAMENODE";
-       response = target.path(path).request().get(String.class);
-       
-       //System.out.println(response);
-       
-       path = "/api/v1/clusters/" + clusterName + "/configurations";
-       response = target.path(path).request().get(String.class);
-       System.out.println(response);
-       
-       JsonArray jarray = jParser.parse(response).getAsJsonObject().getAsJsonArray("items");
-       for(int i =0 ; i < jarray.size(); i++){
-    	   String val = jarray.get(i).getAsJsonObject().getAsJsonPrimitive("type")
-    			   .toString().replaceAll("\"", "");
-    	   if(val.equals("core-site")){
-    		   System.out.println(val);
-    		   val = jarray.get(i).getAsJsonObject().getAsJsonPrimitive("href")
-    				   .toString().replaceAll("\"", "");
-    		   System.out.println(val);
-    		   val = c.target("http://172.17.0.1:8080")
-    		   		.path("/api/v1/clusters/test/configurations?type=hdfs-site&tag=version1")
-    		   		.request().get(String.class);
-    		  
-    		   System.out.println(val);
-    	   }
-       }
-       
-       Path p = new Path("hdfs://172.17.0.2:8020/input");
-       FileSystem fs = FileSystem.get(p.toUri(), new Configuration());
-       
-       fs.listFiles(p, true);
-       
+		RemoteIterator<LocatedFileStatus> filestates = fs.listFiles(new Path(base_path, path), true);
+		while(filestates.hasNext()){
+			LocatedFileStatus fstat  = filestates.next();
+			System.out.println(fstat.toString());
+		}
+	}
+	public void append(final String path, final String content) throws IOException{
+		Path p = new Path(base_path, path);
+		FSDataOutputStream outStream = fs.create(p);
+		
+		outStream.write(content.getBytes());
+		outStream.close();
 	}
 	
+	public String getBlockInformation(final String path) throws IOException{
+		StringBuilder strBuilder = new StringBuilder();
+		Path p = new Path(base_path, path);
+		FileStatus fstatus = fs.getFileStatus(p);
+		BlockLocation[] blocs = fs.getFileBlockLocations(p, 0, fstatus.getLen());
+		int i = 0;
+		strBuilder.append(p.toString() + " Len=" + fstatus.getLen() + ",blockSize=" + fstatus.getBlockSize());
+		for(BlockLocation bloc : blocs){
+			strBuilder.append("\n block" + i++  + " on host: ");
+			for(String host : bloc.getHosts()){
+				strBuilder.append(host + ", ");
+			}
+		}
+		
+		return strBuilder.toString();
+	}
 	
+	private FileSystem fs;
+	private Path base_path;
 
 }
