@@ -27,21 +27,56 @@ import com.sun.jersey.api.client.ClientResponse;
 
 
 public class AmbariWrapper {
+	static Logger logger  = Logger.getLogger("trumanz");
+	
+	static String[] listClusters(final String ambariServer, final String user, String passwd){
+		HttpAuthenticationFeature auth = HttpAuthenticationFeature.basic(user, passwd);
+		ClientConfig clientConfig = new ClientConfig().register(auth);
+		Client  client = ClientBuilder.newClient(clientConfig);
+		String resp = client.target(ambariServer + "/api/v1/clusters").request().get(String.class);
+		logger.debug(resp);
+		JsonParser jParser = new JsonParser();
+		JsonArray jarray = jParser.parse(resp).getAsJsonObject().getAsJsonArray("items");
+		if(jarray.size() == 0) return null;
+		String[] clusters = new String[jarray.size()];
+		for(int i =0; i < jarray.size(); i++){
+			 String cluster = jarray.get(i).getAsJsonObject()
+					 .getAsJsonObject("Clusters").getAsJsonPrimitive("cluster_name")
+					 .toString().replace("\"", "");
+			 clusters[i] = cluster;
+		}
+		return clusters;
+	}
+	
+	static AmbariWrapper getAsFirstCluster(final String ambariServer, 
+			final String user, String passwd) throws Exception{
+		
+		String[] cluster = AmbariWrapper.listClusters(ambariServer, user, passwd);
+		if(cluster.length == 0){
+			throw new Exception("There were no cluster");
+		}
+		logger.info("There were " + cluster.length + " cluster, now use " + cluster[0]);
+		return new  AmbariWrapper(ambariServer, cluster[0], user, passwd);
+	}
+	
+	
 	private Client  client;
-	private	WebTarget wtarget;
+	private	WebTarget clusterTarget;
 	private JsonParser jParser;
-	public AmbariWrapper(final String target, final String user, final String passwd){
+	
+	public AmbariWrapper(final String ambariServer, final String cluster, 
+			final String user, final String passwd){
 		HttpAuthenticationFeature auth = HttpAuthenticationFeature.basic(user, passwd);
 		ClientConfig clientConfig = new ClientConfig().register(auth);
 		client = ClientBuilder.newClient(clientConfig);
-		wtarget = client.target(target);
+		clusterTarget = client.target(ambariServer).path("/api/v1/clusters/" + cluster);
 		jParser = new JsonParser();
 		
 	}
 	
 	public String getDefaultFS() {
 		
-        String val  = wtarget.path("/api/v1/clusters/test/configurations")
+        String val  = clusterTarget.path("/configurations")
         		.queryParam("type", "core-site")
         		.queryParam("tag", "version1")
         		.request().get(String.class);
@@ -53,6 +88,22 @@ public class AmbariWrapper {
         return val;
 	}
 	
+	public String[] listDataNode(){
+		 String val  = clusterTarget.path("/services/HDFS/components/DATANODE")
+				 .request().get(String.class);
+		 Logger.getLogger("trumanz").debug(val);
+		 JsonArray jarray  = jParser.parse(val).getAsJsonObject()
+				 .getAsJsonArray("host_components");
+		 String[] hosts = new String[jarray.size()];
+		 for(int i =0; i < jarray.size(); i++){
+			 String host = jarray.get(i).getAsJsonObject().getAsJsonObject("HostRoles")
+					 .getAsJsonPrimitive("host_name").toString().replace("\"", "");
+			 hosts[i] = host;
+		 }
+		 return hosts;
+	}
+	
+	
 	public boolean stopDataNode(String host) throws InterruptedException{
 		
 		String json = CreateRequestJson("STOP DATANODE", "{\"HostRoles\":{\"state\" : \"INSTALLED\"}}");
@@ -60,7 +111,7 @@ public class AmbariWrapper {
 		//APPLICATION_FORM_URLENCODED, Do no use JSON!!! 
 		Entity<String> entity = Entity.entity(json, MediaType.APPLICATION_FORM_URLENCODED);
 		
-		Response resp =  wtarget.path("/api/v1/clusters/test/hosts/ag2/host_components/DATANODE")
+		Response resp =  clusterTarget.path("/hosts/ag2/host_components/DATANODE")
 			.request().put(entity, Response.class);
 		Logger.getLogger("trumanz").debug(resp.getStatus());
 		

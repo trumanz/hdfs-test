@@ -16,12 +16,13 @@ public class App
 {
     public static void main( String[] args ) throws Exception
     {
+    	/*	
     	try{
     		
-    		
+    	
     	Logger.getLogger("trumanz").info("Hello World");
     	
-        AmbariWrapper ambari = new AmbariWrapper("http://as:8080", "admin", "admin");
+        AmbariWrapper ambari = new AmbariWrapper("http://as:8080", "test", "admin", "admin");
         
         String  hdfs_uri = ambari.getDefaultFS();
         //System.out.println(hdfs_uri);
@@ -37,6 +38,15 @@ public class App
         
         hdfs.showPath("/input");
         Logger.getLogger("trumanz").info(hdfs.getBlockInformation("/input/tt1"));
+        
+        
+         ambari.listDataNode();
+        
+        
+        
+         String[] clusters = AmbariWrapper.listClusters("http://as:8080", "admin", "admin");
+         Logger.getLogger("trumanz").info(clusters.toString());
+        
      //   ambari.stopServiceComponent();
     	}catch(javax.ws.rs.BadRequestException e){
     		
@@ -45,5 +55,6 @@ public class App
     		Logger.getLogger("trumanz").warn(e.getResponse().getMetadata().toString());
     		//throw e;
     	}
+    	*/
     }
 }
