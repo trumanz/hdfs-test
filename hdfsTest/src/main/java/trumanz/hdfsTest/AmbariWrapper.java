@@ -60,12 +60,15 @@ public class AmbariWrapper {
 		//APPLICATION_FORM_URLENCODED, Do no use JSON!!! 
 		Entity<String> entity = Entity.entity(json, MediaType.APPLICATION_FORM_URLENCODED);
 		
-		String val =  wtarget.path("/api/v1/clusters/test/hosts/ag2/host_components/DATANODE")
-			.request().put(entity, String.class);
-	
-		Logger.getLogger("trumanz").debug(val);
+		Response resp =  wtarget.path("/api/v1/clusters/test/hosts/ag2/host_components/DATANODE")
+			.request().put(entity, Response.class);
+		Logger.getLogger("trumanz").debug(resp.getStatus());
 		
-		val = jParser.parse(val).getAsJsonObject()
+		if(resp.getStatus() == 200) return true;
+		
+		Logger.getLogger("trumanz").debug(resp.readEntity(String.class));
+		
+		String val = jParser.parse(resp.readEntity(String.class)).getAsJsonObject()
 				.getAsJsonPrimitive("href").toString().replace("\"","");
 		
 		Logger.getLogger("trumanz").info("mointing reqeust status on:" + val);

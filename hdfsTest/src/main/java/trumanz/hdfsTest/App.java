@@ -22,18 +22,21 @@ public class App
     	Logger.getLogger("trumanz").info("Hello World");
     	
         AmbariWrapper ambari = new AmbariWrapper("http://as:8080", "admin", "admin");
-        /*
+        
         String  hdfs_uri = ambari.getDefaultFS();
         //System.out.println(hdfs_uri);
-        HdfsWrapper hdfs = new HdfsWrapper(hdfs_uri);
-        StringBuilder strBuilder = new StringBuilder();
-        for(int i =0 ; i < 128; i++) strBuilder.append('a');
+       HdfsWrapper hdfs = new HdfsWrapper(hdfs_uri);
+        //StringBuilder strBuilder = new StringBuilder();
+        //for(int i =0 ; i < 128; i++) strBuilder.append('a');
         
-        hdfs.append("/input/tt1", strBuilder.toString());
-        //hdfs.showPath("/input");
-        Logger.getLogger("trumanz").info(hdfs.getBlockInformation("/input/tt1"));
-        */
+        //hdfs.append("/input/tt1", strBuilder.toString());
+        
+      
+    
         ambari.stopDataNode("ag2");
+        
+        hdfs.showPath("/input");
+        Logger.getLogger("trumanz").info(hdfs.getBlockInformation("/input/tt1"));
      //   ambari.stopServiceComponent();
     	}catch(javax.ws.rs.BadRequestException e){
     		
