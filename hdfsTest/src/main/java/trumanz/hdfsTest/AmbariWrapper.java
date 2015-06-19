@@ -60,9 +60,12 @@ public class AmbariWrapper {
 	}
 	
 	
+	
 	private Client  client;
 	private	WebTarget clusterTarget;
-	private JsonParser jParser;
+	private JsonParser jParser = new JsonParser();
+	private Gson gson = new Gson();
+	private List<HostRole>  hostRoles;
 	
 	public AmbariWrapper(final String ambariServer, final String cluster, 
 			final String user, final String passwd){
@@ -70,8 +73,7 @@ public class AmbariWrapper {
 		ClientConfig clientConfig = new ClientConfig().register(auth);
 		client = ClientBuilder.newClient(clientConfig);
 		clusterTarget = client.target(ambariServer).path("/api/v1/clusters/" + cluster);
-		jParser = new JsonParser();
-		
+		hostRoles  = this.listHostComponents(this.listHost());
 	}
 	
 	public String getDefaultFS() {
@@ -86,6 +88,18 @@ public class AmbariWrapper {
         		.getAsJsonObject("properties")
         		.getAsJsonPrimitive("fs.defaultFS").toString().replaceAll("\"", "");
         return val;
+	}
+	
+	public  List<String> listHostByComponent(String compName){
+		List<String> hosts = new LinkedList<String>();
+		for(HostRole role :  hostRoles)
+		{
+			if( role.component_name.equals(compName)){
+				hosts.add(role.host_name);
+			}	
+		}
+		return hosts;
+		
 	}
 	
 	public String[] listDataNode(){
@@ -103,23 +117,33 @@ public class AmbariWrapper {
 		 return hosts;
 	}
 	
+	public void startComponent(String host, String comp) throws InterruptedException{
+		manageCompoent(host, comp, true);
+	}
+	public void stopComponent(String host, String comp) throws InterruptedException{
+		manageCompoent(host, comp, false);
+	}
 	
-	public boolean stopDataNode(String host) throws InterruptedException{
+	void manageCompoent(String host,String comp, boolean start) throws InterruptedException{
 		
-		String json = CreateRequestJson("STOP DATANODE", "{\"HostRoles\":{\"state\" : \"INSTALLED\"}}");
+		String context = start ? "Start " : "Stop";
+		context  = context + " " + comp +  " on " + host;
+		String state =  start ? "STARTED" : "INSTALLED";
+		String json = CreateRequestJson(context, "{\"HostRoles\":{\"state\" : \"" + state +  "\"}}");
 	
 		//APPLICATION_FORM_URLENCODED, Do no use JSON!!! 
 		Entity<String> entity = Entity.entity(json, MediaType.APPLICATION_FORM_URLENCODED);
 		
-		Response resp =  clusterTarget.path("/hosts/ag2/host_components/DATANODE")
+		Response resp =  clusterTarget.path("/hosts/" + host + "/host_components/" + comp)
 			.request().put(entity, Response.class);
 		Logger.getLogger("trumanz").debug(resp.getStatus());
 		
-		if(resp.getStatus() == 200) return true;
+		if(resp.getStatus() == 200) return;
 		
-		Logger.getLogger("trumanz").debug(resp.readEntity(String.class));
+		String respEntity = resp.readEntity(String.class);
+		Logger.getLogger("trumanz").debug(respEntity);
 		
-		String val = jParser.parse(resp.readEntity(String.class)).getAsJsonObject()
+		String val = jParser.parse(respEntity).getAsJsonObject()
 				.getAsJsonPrimitive("href").toString().replace("\"","");
 		
 		Logger.getLogger("trumanz").info("mointing reqeust status on:" + val);
@@ -132,14 +156,13 @@ public class AmbariWrapper {
 			if(status.equals("100.0")){
 				break;
 			} else {
-				Logger.getLogger("trumanz").info("progress_percent:" + status);
+				Logger.getLogger("trumanz").info(context + " progress_percent:" + status);
 				Thread.sleep(5*1000);
 			}
 		}
 		
 		Logger.getLogger("trumanz").info(val);
-		
-		return true;
+		return;
 	}
 	
 	public String CreateRequestJson(String reqContext, String body){
@@ -165,6 +188,72 @@ public class AmbariWrapper {
 		return val;
 		
 	}
+	
+	
+	
+	public void startAllDataNode() throws InterruptedException
+	{
+		for(HostRole role :  hostRoles)
+		{
+			if( role.component_name.equals("DATANODE")){
+				logger.info("Try to start DATANODE on " + role.host_name);
+				startComponent(role.host_name, "DATANODE");
+			}	
+		}
+	}
+	
+	
+	private String[] listHost(){
+		String resp = clusterTarget.path("/hosts").request().get(String.class);
+		JsonArray jarray = jParser.parse(resp).getAsJsonObject()
+				.getAsJsonArray("items");
+		if(jarray.size() == 0 ) return null;
+		String[] hosts = new String[jarray.size()]; 
+		for(int i = 0; i < jarray.size(); i++)
+		{
+			String h = jarray.get(i).getAsJsonObject().getAsJsonObject("Hosts")
+			.getAsJsonPrimitive("host_name").toString().replace("\"", "");
+			hosts[i] = h;
+		}
+		return hosts;
+	}
+	
+	
+	List<HostRole> listHostComponents(String[] hosts){
+		List<HostRole>  hostRoles = new LinkedList<HostRole>();
+		for(String host : hosts){
+			String resp = clusterTarget.path("/hosts/" + host)
+					.request().get(String.class);
+			JsonArray jarray = jParser.parse(resp).getAsJsonObject()
+					.getAsJsonArray("host_components");
+			for(JsonElement jelem : jarray)
+			{
+				
+				HostRole hostRole = gson.fromJson(
+						jelem.getAsJsonObject().getAsJsonObject("HostRoles"), HostRole.class);
+				hostRoles.add(hostRole);
+			}
+		}
+		return hostRoles;
+	}
+	
+	
+	List<AmbariComponent>  listServiceComponents(String serviceName){
+		List<AmbariComponent> comps = new LinkedList<AmbariComponent>();
+		String resp = clusterTarget.path("/services/" + serviceName + "/components")
+				.request().get(String.class);
+		logger.debug(resp);
+		
+		JsonArray jarray = jParser.parse(resp).getAsJsonObject()
+				.getAsJsonArray("items");
+		for(JsonElement jelem : jarray)
+		{	
+			AmbariComponent comp = gson.fromJson(jelem, AmbariComponent.class);
+			comps.add(comp);
+		}
+		return comps;
+	}
+	
 	
 
 }
