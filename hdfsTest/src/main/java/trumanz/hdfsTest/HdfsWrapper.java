@@ -44,13 +44,15 @@ public class HdfsWrapper {
 			System.out.println(fstat.toString());
 		}
 	}
-	public void append(final String path, final String content) throws IOException{
+	public void createFile(final String path, final String content) throws IOException{
 		Path p = new Path(base_path, path);
 		FSDataOutputStream outStream = fs.create(p);
 		
 		outStream.write(content.getBytes());
 		outStream.close();
 	}
+	
+	
 	
 	public String getBlockInformation(final String path) throws IOException{
 		StringBuilder strBuilder = new StringBuilder();
